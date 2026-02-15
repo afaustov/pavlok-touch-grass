@@ -78,8 +78,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function applyMinute() {
     const workLimit = getWorkLimit();
     const breakLimit = getBreakLimit();
+    const minuteActiveSeconds = activeSeconds;
+    const wasAtLimit = fatigue >= workLimit;
 
-    if (activeSeconds >= 10) {
+    if (minuteActiveSeconds >= 10) {
       fatigue++;
       restStreak = 0;
     } else {
@@ -94,9 +96,17 @@ document.addEventListener('DOMContentLoaded', () => {
       fatigue = 0;
     }
 
-    if (fatigue >= workLimit) {
+    const isAtLimit = fatigue >= workLimit;
+    if (isAtLimit) {
       const now = Date.now();
-      if (now - lastAlertTime > 60000) {
+      const crossedLimitNow = !wasAtLimit;
+      const fullyActiveMinute = minuteActiveSeconds >= 60;
+      const canRepeatAtLimit = wasAtLimit && fullyActiveMinute;
+
+      // Safety rule:
+      // - first alert: immediately when crossing to 100%
+      // - repeat alerts at/over 100%: only after a fully active minute
+      if ((crossedLimitNow || canRepeatAtLimit) && now - lastAlertTime > 60000) {
         sendAlert();
         lastAlertTime = now;
       }
