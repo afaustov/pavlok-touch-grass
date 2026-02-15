@@ -1,0 +1,16 @@
+{
+  "name": "pavlok-touch-grass",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "dev:web": "vite",
+    "screenshot": "node scripts/capture-widget.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "playwright": "^1.58.2",
+    "vite": "^7.2.0"
+  }
+}

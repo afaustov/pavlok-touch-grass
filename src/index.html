@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pavlok Activity Guard</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Google Fonts for premium typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <!-- Load Tauri specific script -->
+  <script src="main.js" defer></script>
+</head>
+
+<body>
+  <!-- Drag Handle region for Tauri (invisible but draggable) -->
+  <div id="app-circle">
+    <div class="charge-burst" aria-hidden="true"></div>
+
+    <div class="upper-stack">
+      <!-- Top Control Row: Alert Mode -->
+      <div class="controls-row">
+        <!-- Alert Mode Toggle -->
+        <button id="alert-mode-btn" class="control-btn mode-btn" aria-label="Toggle Alert Mode" title="Beep">
+          <div class="icon-container">
+            <svg id="icon-beep" class="mode-icon active" viewBox="0 0 24 24" fill="none"
+              xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z"
+                fill="currentColor" />
+            </svg>
+            <svg id="icon-vibro" class="mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M16 19H8C6.9 19 6 18.1 6 17V7C6 5.9 6.9 5 8 5H16C17.1 5 18 5.9 18 7V17C18 18.1 17.1 19 16 19ZM20 9H22V15H20V9ZM2 9H4V15H2V9ZM16 7H8V17H16V7Z"
+                fill="currentColor" />
+            </svg>
+            <svg id="icon-zap" class="mode-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M7 2V13H10V22L17 10H14V2H7Z" fill="currentColor" />
+            </svg>
+          </div>
+        </button>
+      </div>
+
+      <!-- Fatigue Status (Upper Center) -->
+      <div class="fatigue-status">
+        <span class="fatigue-value" id="fatigue-display">
+          <span id="fatigue-value-number">0</span><span class="fatigue-unit">%</span>
+        </span>
+      </div>
+
+      <!-- Central Bolt (Interactive Area) -->
+      <div class="bolt-container">
+        <svg class="pavlok-bolt" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" title="Start Timer" aria-label="Start Timer">
+          <defs>
+            <clipPath id="bolt-fill-clip">
+              <rect id="bolt-fill-rect" x="0" y="24" width="24" height="0"></rect>
+            </clipPath>
+          </defs>
+          <path class="bolt-base-path" d="M7 2V13H10V22L17 10H14V2H7Z" />
+          <path class="bolt-fill-path" clip-path="url(#bolt-fill-clip)" d="M7 2V13H10V22L17 10H14V2H7Z" />
+        </svg>
+      </div>
+    </div>
+
+    <!-- API Key Input (Below Bolt) -->
+    <div class="api-container">
+      <input type="password" id="api-token" class="api-input" placeholder="API Token" autocomplete="off"
+        title="Paste your Pavlok API Token here">
+    </div>
+
+    <!-- Timer Displays (Lower Center) -->
+    <div class="timers-container">
+      <div class="timer-block">
+        <span class="timer-label" title="Minutes of active work to reach 100% fatigue">WORK</span>
+        <input type="number" id="work-timer" class="timer-input" value="45" min="1" max="99" title="Minutes of active work to reach 100% fatigue">
+      </div>
+      <div class="timer-divider"></div>
+      <div class="timer-block">
+        <span class="timer-label" title="Minutes of rest to recover fatigue from 100% to 0%">BREAK</span>
+        <input type="number" id="break-timer" class="timer-input" value="5" min="1" max="99" title="Minutes of rest to recover fatigue from 100% to 0%">
+      </div>
+    </div>
+
+    <div class="resize-handle top" data-dir="n" aria-hidden="true"></div>
+    <div class="resize-handle right" data-dir="e" aria-hidden="true"></div>
+    <div class="resize-handle bottom" data-dir="s" aria-hidden="true"></div>
+    <div class="resize-handle left" data-dir="w" aria-hidden="true"></div>
+    <div class="resize-handle top-left" data-dir="nw" aria-hidden="true"></div>
+    <div class="resize-handle top-right" data-dir="ne" aria-hidden="true"></div>
+    <div class="resize-handle bottom-left" data-dir="sw" aria-hidden="true"></div>
+    <div class="resize-handle bottom-right" data-dir="se" aria-hidden="true"></div>
+  </div>
+</body>
+
+</html>
