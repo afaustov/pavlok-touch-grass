@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let secondCounter = 0;
   let lastAlertTime = 0;
   let apiKeyInvalid = false;
+  let lastTickAt = null;
 
   function setProgress(ringPercent, displayPercent = ringPercent) {
     const normalized = Math.max(0, Math.min(100, ringPercent));
@@ -72,6 +73,57 @@ document.addEventListener('DOMContentLoaded', () => {
     const fatiguePercent = (fatigue / workLimit) * 100;
     setProgress(fatiguePercent, fatiguePercent);
     updateApiWarningState();
+  }
+
+  function applyMinute() {
+    const workLimit = getWorkLimit();
+    const breakLimit = getBreakLimit();
+
+    if (activeSeconds >= 10) {
+      fatigue++;
+      restStreak = 0;
+    } else {
+      if (fatigue > 0) fatigue--;
+      restStreak++;
+    }
+
+    activeSeconds = 0;
+    secondCounter = 0;
+
+    if (restStreak >= breakLimit) {
+      fatigue = 0;
+    }
+
+    if (fatigue >= workLimit) {
+      const now = Date.now();
+      if (now - lastAlertTime > 60000) {
+        sendAlert();
+        lastAlertTime = now;
+      }
+    }
+
+    refreshFatigueUI();
+  }
+
+  function applySampleSeconds(activeSecs, inactiveSecs) {
+    const totalSeconds = Math.max(0, activeSecs + inactiveSecs);
+    if (totalSeconds === 0) return;
+
+    if (activeSecs > 0) {
+      activeSeconds += activeSecs;
+    }
+
+    let remaining = totalSeconds;
+    while (remaining > 0) {
+      const toMinuteBoundary = 60 - secondCounter;
+      const step = Math.min(remaining, toMinuteBoundary);
+      secondCounter += step;
+      remaining -= step;
+
+      if (secondCounter >= 60) {
+        applyMinute();
+      }
+    }
   }
 
   function isAtLimit() {
@@ -208,44 +260,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!isMonitoring) return;
 
     try {
+      const now = Date.now();
+      if (lastTickAt == null) {
+        lastTickAt = now;
+      }
+      const elapsedSeconds = Math.max(1, Math.floor((now - lastTickAt) / 1000));
+      lastTickAt = now;
+
       const idleSeconds = await invoke('get_idle_seconds');
-
-      if (idleSeconds < 2.0) {
-        activeSeconds++;
-      }
-
-      secondCounter++;
-
-      if (secondCounter >= 60) {
-        const workLimit = getWorkLimit();
-        const breakLimit = getBreakLimit();
-
-        // Legacy minute-based model (state before resize request)
-        if (activeSeconds >= 10) {
-          fatigue++;
-          restStreak = 0;
-        } else {
-          if (fatigue > 0) fatigue--;
-          restStreak++;
-        }
-
-        activeSeconds = 0;
-        secondCounter = 0;
-
-        if (restStreak >= breakLimit) {
-          fatigue = 0;
-        }
-
-        if (fatigue >= workLimit) {
-          const now = Date.now();
-          if (now - lastAlertTime > 60000) {
-            sendAlert();
-            lastAlertTime = now;
-          }
-        }
-
-        refreshFatigueUI();
-      }
+      const activeNow = idleSeconds < 2.0;
+      const missedSeconds = Math.max(0, elapsedSeconds - 1);
+      applySampleSeconds(activeNow ? 1 : 0, (activeNow ? 0 : 1) + missedSeconds);
 
     } catch (e) {
       console.error("Invoke Error:", e);
@@ -312,8 +337,10 @@ document.addEventListener('DOMContentLoaded', () => {
       // New run starts a fresh minute window; fatigue value is preserved.
       activeSeconds = 0;
       secondCounter = 0;
+      lastTickAt = Date.now();
       appCircle.classList.add('monitoring');
     } else {
+      lastTickAt = null;
       appCircle.classList.remove('monitoring');
     }
   }
@@ -324,6 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
     activeSeconds = 0;
     secondCounter = 0;
     lastAlertTime = 0;
+    lastTickAt = Date.now();
     setProgress(0, 0);
   }
 
