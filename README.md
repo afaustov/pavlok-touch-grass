@@ -26,7 +26,7 @@ When fatigue reaches or exceeds `WORK` (100%), the app sends a Pavlok stimulus (
 
 ## How to use
 
-1. Download and run the portable EXE: https://github.com/afaustov/pavlok-touch-grass/releases/latest/download/pavlok-touch-grass.exe
+1. Download and run the portable EXE from Releases: https://github.com/afaustov/pavlok-touch-grass/releases
 2. Get your API key from Pavlok docs: https://pavlok.readme.io/reference/intro/authentication
 3. Paste the token into the widget field `Input your API Key here`
 4. Set your `WORK` and `BREAK` intervals

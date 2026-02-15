@@ -453,13 +453,13 @@ body {
 
 
 .api-input::placeholder {
-  color: transparent !important;
-  opacity: 0 !important;
+  color: rgba(255, 255, 255, 0.45);
+  opacity: 1;
 }
 
 .api-input:focus::placeholder {
-  color: transparent !important;
-  opacity: 0 !important;
+  color: rgba(255, 255, 255, 0.3);
+  opacity: 1;
 }
 
 .charge-burst {
