@@ -2,6 +2,8 @@
 
 Desktop widget for Pavlok that tracks your activity/rest balance and sends Pavlok alerts when fatigue reaches 100%.
 
+![Widget screenshot](docs/widget.png)
+
 ## What The App Monitors
 
 The app checks your **system idle time** once per second (Windows `GetLastInputInfo`).
@@ -22,11 +24,13 @@ Where:
 
 When fatigue reaches or exceeds `WORK` (100%), the app sends a Pavlok stimulus (`beep`, `vibe`, or `zap`) with a 60-second cooldown between sends.
 
-## Get Your Pavlok API Key
+## How to use
 
-1. Open: https://pavlok.readme.io/reference/intro/authentication
-2. Follow Pavlok auth instructions and obtain your bearer token
-3. Paste it into the widget `API Token` field
+1. Download and run the portable EXE: https://github.com/afaustov/pavlok-touch-grass/releases/latest/download/pavlok-touch-grass.exe
+2. Get your API key from Pavlok docs: https://pavlok.readme.io/reference/intro/authentication
+3. Paste the token into the widget field `Input your API Key here`
+4. Set your `WORK` and `BREAK` intervals
+5. Click the bolt icon to start monitoring
 
 Accepted formats:
 
