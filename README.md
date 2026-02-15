@@ -4,6 +4,11 @@ Desktop widget for Pavlok that tracks your activity/rest balance and sends Pavlo
 
 ![Widget screenshot](docs/widget.png)
 
+## Disclaimer
+
+This is an independent community project and is not affiliated with, endorsed by, or sponsored by Pavlok.
+To use this app, you must have a compatible Pavlok device and your own Pavlok API access token.
+
 ## What The App Monitors
 
 The app checks your **system idle time** once per second (Windows `GetLastInputInfo`).
