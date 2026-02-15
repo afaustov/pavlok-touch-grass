@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let lastAlertTime = 0;
   let apiKeyInvalid = false;
   let lastTickAt = null;
+  let atLimitActiveStreakSeconds = 0;
 
   function setProgress(ringPercent, displayPercent = ringPercent) {
     const normalized = Math.max(0, Math.min(100, ringPercent));
@@ -97,19 +98,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const isAtLimit = fatigue >= workLimit;
-    if (isAtLimit) {
+    if (isAtLimit && !wasAtLimit) {
       const now = Date.now();
-      const crossedLimitNow = !wasAtLimit;
-      const fullyActiveMinute = minuteActiveSeconds >= 60;
-      const canRepeatAtLimit = wasAtLimit && fullyActiveMinute;
-
-      // Safety rule:
-      // - first alert: immediately when crossing to 100%
-      // - repeat alerts at/over 100%: only after a fully active minute
-      if ((crossedLimitNow || canRepeatAtLimit) && now - lastAlertTime > 60000) {
+      atLimitActiveStreakSeconds = 0;
+      if (now - lastAlertTime > 60000) {
         sendAlert();
         lastAlertTime = now;
       }
+    }
+    if (!isAtLimit) {
+      atLimitActiveStreakSeconds = 0;
     }
 
     refreshFatigueUI();
@@ -119,9 +117,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalSeconds = Math.max(0, activeSecs + inactiveSecs);
     if (totalSeconds === 0) return;
 
-    if (activeSecs > 0) {
-      activeSeconds += activeSecs;
+    if (inactiveSecs > 0) {
+      atLimitActiveStreakSeconds = 0;
     }
+    if (activeSecs > 0) activeSeconds += activeSecs;
 
     let remaining = totalSeconds;
     while (remaining > 0) {
@@ -132,6 +131,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (secondCounter >= 60) {
         applyMinute();
+      }
+    }
+
+    if (fatigue >= getWorkLimit() && activeSecs > 0) {
+      atLimitActiveStreakSeconds += activeSecs;
+      const now = Date.now();
+      if (atLimitActiveStreakSeconds >= 61 && now - lastAlertTime > 60000) {
+        sendAlert();
+        lastAlertTime = now;
+        atLimitActiveStreakSeconds = 0;
       }
     }
   }
@@ -280,7 +289,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const idleSeconds = await invoke('get_idle_seconds');
       const activeNow = idleSeconds < 2.0;
       const missedSeconds = Math.max(0, elapsedSeconds - 1);
-      applySampleSeconds(activeNow ? 1 : 0, (activeNow ? 0 : 1) + missedSeconds);
+      if (missedSeconds > 0) {
+        applySampleSeconds(0, missedSeconds);
+      }
+      applySampleSeconds(activeNow ? 1 : 0, activeNow ? 0 : 1);
 
     } catch (e) {
       console.error("Invoke Error:", e);
@@ -348,9 +360,11 @@ document.addEventListener('DOMContentLoaded', () => {
       activeSeconds = 0;
       secondCounter = 0;
       lastTickAt = Date.now();
+      atLimitActiveStreakSeconds = 0;
       appCircle.classList.add('monitoring');
     } else {
       lastTickAt = null;
+      atLimitActiveStreakSeconds = 0;
       appCircle.classList.remove('monitoring');
     }
   }
@@ -362,6 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
     secondCounter = 0;
     lastAlertTime = 0;
     lastTickAt = Date.now();
+    atLimitActiveStreakSeconds = 0;
     setProgress(0, 0);
   }
 
