@@ -113,11 +113,11 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshFatigueUI();
   }
 
-  function applySampleSeconds(activeSecs, inactiveSecs) {
+  function applySampleSeconds(activeSecs, inactiveSecs, resetAtLimitStreakOnInactive = true) {
     const totalSeconds = Math.max(0, activeSecs + inactiveSecs);
     if (totalSeconds === 0) return;
 
-    if (inactiveSecs > 0) {
+    if (inactiveSecs > 0 && resetAtLimitStreakOnInactive) {
       atLimitActiveStreakSeconds = 0;
     }
     if (activeSecs > 0) activeSeconds += activeSecs;
@@ -276,21 +276,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Monitoring Loop (1s Tick) ---
   setInterval(async () => {
-    if (!isMonitoring) return;
+    const now = Date.now();
+    if (lastTickAt == null) {
+      lastTickAt = now;
+    }
+    const elapsedSeconds = Math.max(1, Math.floor((now - lastTickAt) / 1000));
+    lastTickAt = now;
+
+    if (!isMonitoring) {
+      // In paused mode we do not accumulate active time, but fatigue recovery
+      // still follows the same per-minute rest rules as usual.
+      applySampleSeconds(0, elapsedSeconds);
+      return;
+    }
 
     try {
-      const now = Date.now();
-      if (lastTickAt == null) {
-        lastTickAt = now;
-      }
-      const elapsedSeconds = Math.max(1, Math.floor((now - lastTickAt) / 1000));
-      lastTickAt = now;
-
       const idleSeconds = await invoke('get_idle_seconds');
       const activeNow = idleSeconds < 2.0;
       const missedSeconds = Math.max(0, elapsedSeconds - 1);
       if (missedSeconds > 0) {
-        applySampleSeconds(0, missedSeconds);
+        // Missed ticks are timing jitter/lag; keep minute accounting,
+        // but do not break the continuous-at-limit repeat window.
+        applySampleSeconds(0, missedSeconds, false);
       }
       applySampleSeconds(activeNow ? 1 : 0, activeNow ? 0 : 1);
 
