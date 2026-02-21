@@ -50,3 +50,17 @@ Accepted formats:
   - `Get API Key`
   - `Reset Fatigue`
   - `Quit`
+
+## Release Process
+
+1. Update versions in all app manifests:
+   - `npm run release:prepare -- 1.0.0`
+2. Commit and push:
+   - `git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml scripts/release-version.mjs .github/workflows/release.yml README.md`
+   - `git commit -m "release: v1.0.0"`
+   - `git push origin main`
+3. Create and push a release tag:
+   - `git tag v1.0.0`
+   - `git push origin v1.0.0`
+
+After the tag push, GitHub Actions builds Windows `.exe` and publishes it in the Release assets.

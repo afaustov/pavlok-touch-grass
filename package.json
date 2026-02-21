@@ -1,12 +1,13 @@
 {
   "name": "pavlok-touch-grass",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "tauri": "tauri",
     "dev:web": "vite",
-    "screenshot": "node scripts/capture-widget.mjs"
+    "screenshot": "node scripts/capture-widget.mjs",
+    "release:prepare": "node scripts/release-version.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
