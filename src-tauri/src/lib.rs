@@ -30,6 +30,9 @@ const DEFAULT_WIDGET_WIDTH: f64 = 360.0;
 const DEFAULT_WIDGET_HEIGHT: f64 = 382.0;
 const MIN_WIDGET_WIDTH: f64 = 340.0;
 const MIN_WIDGET_HEIGHT: f64 = 382.0;
+const DEFAULT_WINDOW_MARGIN: i32 = 9;
+const WINDOW_TOP_GUTTER: i32 = 38;
+const TOP_MARGIN_FINE_TUNE: i32 = 31;
 
 fn window_state_file(app: &tauri::AppHandle) -> Option<PathBuf> {
     let mut dir = app.path().app_data_dir().ok()?;
@@ -85,17 +88,17 @@ fn save_webview_window_state(window: &WebviewWindow) {
     }
 }
 
-fn restore_window_state(window: &WebviewWindow) {
+fn restore_window_state(window: &WebviewWindow) -> bool {
     let Some(path) = window_state_file(&window.app_handle()) else {
-        return;
+        return false;
     };
 
     let Ok(raw) = fs::read_to_string(path) else {
-        return;
+        return false;
     };
 
     let Ok(saved) = serde_json::from_str::<SavedWindowState>(&raw) else {
-        return;
+        return false;
     };
 
     if let (Some(width), Some(height)) = (saved.width, saved.height) {
@@ -104,11 +107,29 @@ fn restore_window_state(window: &WebviewWindow) {
         }
     }
     let _ = window.set_position(Position::Physical(PhysicalPosition::new(saved.x, saved.y)));
+    true
+}
+
+fn set_default_top_right_position(window: &WebviewWindow) {
+    let Ok(Some(monitor)) = window.current_monitor() else {
+        return;
+    };
+
+    let monitor_origin = monitor.position();
+    let monitor_size = monitor.size();
+    let window_size = window
+        .outer_size()
+        .unwrap_or_else(|_| PhysicalSize::new(DEFAULT_WIDGET_WIDTH as u32, DEFAULT_WIDGET_HEIGHT as u32));
+
+    let x = monitor_origin.x + monitor_size.width as i32 - window_size.width as i32 - DEFAULT_WINDOW_MARGIN;
+    // Compensate transparent top gutter and apply extra upward tuning for visual symmetry.
+    let y = monitor_origin.y + DEFAULT_WINDOW_MARGIN - WINDOW_TOP_GUTTER - TOP_MARGIN_FINE_TUNE;
+    let _ = window.set_position(Position::Physical(PhysicalPosition::new(x.max(monitor_origin.x), y)));
 }
 
 fn reset_window_to_default(window: &WebviewWindow) {
     let _ = window.set_size(Size::Logical(LogicalSize::new(DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT)));
-    let _ = window.center();
+    set_default_top_right_position(window);
 }
 
 fn clear_saved_window_state(app: &tauri::AppHandle) {
@@ -590,7 +611,9 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_min_size(Some(Size::Logical(LogicalSize::new(MIN_WIDGET_WIDTH, MIN_WIDGET_HEIGHT))));
-                restore_window_state(&window);
+                if !restore_window_state(&window) {
+                    reset_window_to_default(&window);
+                }
                 let _ = ensure_webview_borderless(&window);
             }
 

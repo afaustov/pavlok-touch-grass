@@ -1,6 +1,6 @@
 [package]
 name = "pavlok-touch-grass"
-version = "1.0.0"
+version = "1.0.1"
 description = "Pavlok: Touch Grass"
 authors = ["you"]
 edition = "2021"
