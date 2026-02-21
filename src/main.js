@@ -43,7 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let lastAlertTime = 0;
   let apiKeyInvalid = false;
   let lastTickAt = null;
-  let atLimitActiveStreakSeconds = 0;
 
   function setProgress(ringPercent, displayPercent = ringPercent) {
     const normalized = Math.max(0, Math.min(100, ringPercent));
@@ -80,10 +79,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const workLimit = getWorkLimit();
     const breakLimit = getBreakLimit();
     const minuteActiveSeconds = activeSeconds;
-    const wasAtLimit = fatigue >= workLimit;
 
     if (minuteActiveSeconds >= 10) {
-      fatigue++;
+      // While paused, activity should not increase fatigue.
+      if (isMonitoring) {
+        fatigue++;
+      }
       restStreak = 0;
     } else {
       if (fatigue > 0) fatigue--;
@@ -98,28 +99,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const isAtLimit = fatigue >= workLimit;
-    if (isAtLimit && !wasAtLimit) {
+    if (isAtLimit && isMonitoring) {
       const now = Date.now();
-      atLimitActiveStreakSeconds = 0;
-      if (now - lastAlertTime > 60000) {
+      if (now - lastAlertTime >= 60000) {
         sendAlert();
         lastAlertTime = now;
       }
-    }
-    if (!isAtLimit) {
-      atLimitActiveStreakSeconds = 0;
     }
 
     refreshFatigueUI();
   }
 
-  function applySampleSeconds(activeSecs, inactiveSecs, resetAtLimitStreakOnInactive = true) {
+  function applySampleSeconds(activeSecs, inactiveSecs) {
     const totalSeconds = Math.max(0, activeSecs + inactiveSecs);
     if (totalSeconds === 0) return;
-
-    if (inactiveSecs > 0 && resetAtLimitStreakOnInactive) {
-      atLimitActiveStreakSeconds = 0;
-    }
     if (activeSecs > 0) activeSeconds += activeSecs;
 
     let remaining = totalSeconds;
@@ -134,15 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    if (fatigue >= getWorkLimit() && activeSecs > 0) {
-      atLimitActiveStreakSeconds += activeSecs;
-      const now = Date.now();
-      if (atLimitActiveStreakSeconds >= 61 && now - lastAlertTime > 60000) {
-        sendAlert();
-        lastAlertTime = now;
-        atLimitActiveStreakSeconds = 0;
-      }
-    }
   }
 
   function isAtLimit() {
@@ -158,6 +142,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (localStorage.getItem('workTime')) workInput.value = localStorage.getItem('workTime');
   if (localStorage.getItem('breakTime')) breakInput.value = localStorage.getItem('breakTime');
   if (localStorage.getItem('apiToken')) apiInput.value = localStorage.getItem('apiToken');
+  {
+    const savedMode = localStorage.getItem('alertMode');
+    const savedModeIndex = modes.indexOf(savedMode);
+    if (savedModeIndex >= 0) currentModeIndex = savedModeIndex;
+  }
 
   // Tray action: reset fatigue from native menu
   if (tauri?.event?.listen) {
@@ -240,6 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
     e.stopPropagation();
     currentModeIndex = (currentModeIndex + 1) % modes.length;
     updateModeUI();
+    localStorage.setItem('alertMode', modes[currentModeIndex]);
     triggerHapticVisual(modeBtn);
   });
 
@@ -283,26 +273,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const elapsedSeconds = Math.max(1, Math.floor((now - lastTickAt) / 1000));
     lastTickAt = now;
 
-    if (!isMonitoring) {
-      // In paused mode we do not accumulate active time, but fatigue recovery
-      // still follows the same per-minute rest rules as usual.
-      applySampleSeconds(0, elapsedSeconds);
-      return;
-    }
-
     try {
       const idleSeconds = await invoke('get_idle_seconds');
       const activeNow = idleSeconds < 2.0;
       const missedSeconds = Math.max(0, elapsedSeconds - 1);
       if (missedSeconds > 0) {
-        // Missed ticks are timing jitter/lag; keep minute accounting,
-        // but do not break the continuous-at-limit repeat window.
-        applySampleSeconds(0, missedSeconds, false);
+        // Missed ticks are timing jitter/lag; keep minute accounting.
+        applySampleSeconds(0, missedSeconds);
       }
       applySampleSeconds(activeNow ? 1 : 0, activeNow ? 0 : 1);
 
     } catch (e) {
       console.error("Invoke Error:", e);
+      // If idle probe fails (e.g. during lock/unlock IPC hiccups),
+      // treat elapsed time as inactivity so recovery continues.
+      applySampleSeconds(0, elapsedSeconds);
     }
 
   }, 1000);
@@ -367,11 +352,9 @@ document.addEventListener('DOMContentLoaded', () => {
       activeSeconds = 0;
       secondCounter = 0;
       lastTickAt = Date.now();
-      atLimitActiveStreakSeconds = 0;
       appCircle.classList.add('monitoring');
     } else {
       lastTickAt = null;
-      atLimitActiveStreakSeconds = 0;
       appCircle.classList.remove('monitoring');
     }
   }
@@ -383,7 +366,6 @@ document.addEventListener('DOMContentLoaded', () => {
     secondCounter = 0;
     lastAlertTime = 0;
     lastTickAt = Date.now();
-    atLimitActiveStreakSeconds = 0;
     setProgress(0, 0);
   }
 

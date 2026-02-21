@@ -1,4 +1,4 @@
-use tauri::{Emitter, LogicalSize, Manager, PhysicalPosition, Position, Size, WebviewWindow, Window, window::Color};
+use tauri::{Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, Position, Size, WebviewWindow, Window, window::Color};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::menu::{Menu, MenuItem};
 use tauri_plugin_opener::OpenerExt;
@@ -19,22 +19,26 @@ use windows::Win32::UI::WindowsAndMessaging::SendMessageW;
 use windows::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture;
 
 #[derive(Debug, Serialize, Deserialize)]
-struct SavedWindowPosition {
+struct SavedWindowState {
     x: i32,
     y: i32,
+    width: Option<u32>,
+    height: Option<u32>,
 }
 
+const DEFAULT_WIDGET_WIDTH: f64 = 360.0;
+const DEFAULT_WIDGET_HEIGHT: f64 = 382.0;
 const MIN_WIDGET_WIDTH: f64 = 340.0;
 const MIN_WIDGET_HEIGHT: f64 = 382.0;
 
-fn window_position_file(app: &tauri::AppHandle) -> Option<PathBuf> {
+fn window_state_file(app: &tauri::AppHandle) -> Option<PathBuf> {
     let mut dir = app.path().app_data_dir().ok()?;
-    dir.push("window-position.json");
+    dir.push("window-state.json");
     Some(dir)
 }
 
-fn save_window_position(window: &Window) {
-    let Some(path) = window_position_file(&window.app_handle()) else {
+fn save_window_state(window: &Window) {
+    let Some(path) = window_state_file(&window.app_handle()) else {
         return;
     };
 
@@ -43,9 +47,12 @@ fn save_window_position(window: &Window) {
     }
 
     if let Ok(position) = window.outer_position() {
-        let data = SavedWindowPosition {
+        let size = window.outer_size().ok();
+        let data = SavedWindowState {
             x: position.x,
             y: position.y,
+            width: size.map(|s| s.width),
+            height: size.map(|s| s.height),
         };
 
         if let Ok(json) = serde_json::to_string(&data) {
@@ -54,8 +61,32 @@ fn save_window_position(window: &Window) {
     }
 }
 
-fn restore_window_position(window: &WebviewWindow) {
-    let Some(path) = window_position_file(&window.app_handle()) else {
+fn save_webview_window_state(window: &WebviewWindow) {
+    let Some(path) = window_state_file(&window.app_handle()) else {
+        return;
+    };
+
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+
+    if let Ok(position) = window.outer_position() {
+        let size = window.outer_size().ok();
+        let data = SavedWindowState {
+            x: position.x,
+            y: position.y,
+            width: size.map(|s| s.width),
+            height: size.map(|s| s.height),
+        };
+
+        if let Ok(json) = serde_json::to_string(&data) {
+            let _ = fs::write(path, json);
+        }
+    }
+}
+
+fn restore_window_state(window: &WebviewWindow) {
+    let Some(path) = window_state_file(&window.app_handle()) else {
         return;
     };
 
@@ -63,11 +94,27 @@ fn restore_window_position(window: &WebviewWindow) {
         return;
     };
 
-    let Ok(saved) = serde_json::from_str::<SavedWindowPosition>(&raw) else {
+    let Ok(saved) = serde_json::from_str::<SavedWindowState>(&raw) else {
         return;
     };
 
+    if let (Some(width), Some(height)) = (saved.width, saved.height) {
+        if width > 0 && height > 0 {
+            let _ = window.set_size(Size::Physical(PhysicalSize::new(width, height)));
+        }
+    }
     let _ = window.set_position(Position::Physical(PhysicalPosition::new(saved.x, saved.y)));
+}
+
+fn reset_window_to_default(window: &WebviewWindow) {
+    let _ = window.set_size(Size::Logical(LogicalSize::new(DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT)));
+    let _ = window.center();
+}
+
+fn clear_saved_window_state(app: &tauri::AppHandle) {
+    if let Some(path) = window_state_file(app) {
+        let _ = fs::remove_file(path);
+    }
 }
 
 
@@ -492,8 +539,9 @@ pub fn run() {
 
             let get_api_key_i = MenuItem::with_id(app, "get_api_key", "Get API Key", true, None::<&str>)?;
             let reset_fatigue_i = MenuItem::with_id(app, "reset_fatigue", "Reset Fatigue", true, None::<&str>)?;
+            let reset_default_position_i = MenuItem::with_id(app, "reset_default_position", "Reset Default Position", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&get_api_key_i, &reset_fatigue_i, &quit_i])?;
+            let menu = Menu::with_items(app, &[&get_api_key_i, &reset_fatigue_i, &reset_default_position_i, &quit_i])?;
 
             let tray_icon = app.default_window_icon().cloned();
 
@@ -507,6 +555,14 @@ pub fn run() {
                         let _ = app.opener().open_url(API_KEY_HELP_URL, None::<&str>);
                     } else if event.id() == "reset_fatigue" {
                         let _ = app.emit("reset-fatigue", ());
+                    } else if event.id() == "reset_default_position" {
+                        clear_saved_window_state(app);
+                        if let Some(window) = app.get_webview_window("main") {
+                            reset_window_to_default(&window);
+                            #[cfg(target_os = "windows")]
+                            let _ = ensure_webview_borderless(&window);
+                            save_webview_window_state(&window);
+                        }
                     }
                 })
                 .on_tray_icon_event(|tray, event| {
@@ -534,7 +590,7 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_min_size(Some(Size::Logical(LogicalSize::new(MIN_WIDGET_WIDTH, MIN_WIDGET_HEIGHT))));
-                restore_window_position(&window);
+                restore_window_state(&window);
                 let _ = ensure_webview_borderless(&window);
             }
 
@@ -543,13 +599,14 @@ pub fn run() {
         .on_window_event(|window, event| {
             match event {
                 tauri::WindowEvent::CloseRequested { .. } => {
-                    save_window_position(window);
+                    save_window_state(window);
                     window.app_handle().exit(0);
                 }
                 tauri::WindowEvent::Moved(_) => {
-                    save_window_position(window);
+                    save_window_state(window);
                 }
                 tauri::WindowEvent::Resized(_) => {
+                    save_window_state(window);
                     #[cfg(target_os = "windows")]
                     {
                         let win = window.clone();
