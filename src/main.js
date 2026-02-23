@@ -79,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const workLimit = getWorkLimit();
     const breakLimit = getBreakLimit();
     const minuteActiveSeconds = activeSeconds;
+    const previousFatigue = fatigue;
 
     if (minuteActiveSeconds >= 10) {
       // While paused, activity should not increase fatigue.
@@ -96,6 +97,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (restStreak >= breakLimit) {
       fatigue = 0;
+    }
+
+    if (previousFatigue > 0 && fatigue === 0) {
+      sendDoubleVibroAlertOnce();
     }
 
     const isAtLimit = fatigue >= workLimit;
@@ -292,9 +297,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   }, 1000);
 
-  async function sendAlert() {
+  async function sendAlert(typeOverride = null) {
     const token = apiInput.value;
-    const type = modes[currentModeIndex];
+    const type = typeOverride || modes[currentModeIndex];
 
     if (!token || !token.trim()) {
       console.warn("Alert Triggered but NO TOKEN set.");
@@ -319,6 +324,12 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
       console.error("Alert Failed:", e);
     }
+  }
+
+  async function sendDoubleVibroAlertOnce() {
+    await sendAlert('vibro');
+    await new Promise(resolve => setTimeout(resolve, 200));
+    await sendAlert('vibro');
   }
 
   // --- Helpers ---
@@ -360,6 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function resetFatigue() {
+    const previousFatigue = fatigue;
     fatigue = 0;
     restStreak = 0;
     activeSeconds = 0;
@@ -367,6 +379,10 @@ document.addEventListener('DOMContentLoaded', () => {
     lastAlertTime = 0;
     lastTickAt = Date.now();
     setProgress(0, 0);
+
+    if (previousFatigue > 0) {
+      sendDoubleVibroAlertOnce();
+    }
   }
 
   function triggerHapticVisual(element) {
